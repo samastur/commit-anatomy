@@ -1,6 +1,7 @@
 """commit-anatomy command line."""
 
 import functools
+import os
 import sqlite3
 import sys
 from collections.abc import Iterator
@@ -91,6 +92,15 @@ def _warn_unlexed(analyzer: Analyzer) -> None:
         _stderr().print(Text(message, style="yellow"))
 
 
+def _is_cache_error(e: Exception) -> bool:
+    if isinstance(e, sqlite3.Error):
+        return True
+    filename = getattr(e, "filename", None)
+    if filename is None:
+        return False
+    return Path(os.path.abspath(filename)).is_relative_to(os.path.abspath(cache_home()))
+
+
 def _handle_errors(fn):
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
@@ -103,9 +113,14 @@ def _handle_errors(fn):
             _stderr().print(Text(f"error: {e}", style="red"))
             raise typer.Exit(1) from None
         except (sqlite3.Error, OSError) as e:
-            path = cache_home() / "cache.sqlite"
-            hint = "delete the file or run `commit-anatomy cache clear`"
-            message = Text(f"error: cache {path}: {e} ({hint})", style="red")
+            if _is_cache_error(e):
+                path = cache_home() / "cache.sqlite"
+                hint = "delete the file or run `commit-anatomy cache clear`"
+                message = Text(f"error: cache {path}: {e} ({hint})", style="red")
+            elif isinstance(e, OSError) and e.filename is not None:
+                message = Text(f"error: {e.filename}: {e.strerror}", style="red")
+            else:
+                message = Text(f"error: {e}", style="red")
             _stderr().print(message, soft_wrap=True)
             raise typer.Exit(1) from None
 
