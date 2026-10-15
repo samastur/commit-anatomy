@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import posixpath
-from functools import cache
+from functools import cache, lru_cache
 
 import pygments
 from pygments.lexer import Lexer
@@ -23,7 +23,7 @@ def _lexer(alias: str) -> Lexer:
     return get_lexer_by_name(alias, stripnl=False, stripall=False, ensurenl=True)
 
 
-@cache
+@lru_cache(maxsize=4096)
 def _alias(basename: str, hint: str | None) -> str | None:
     lexer = None
     if hint:
