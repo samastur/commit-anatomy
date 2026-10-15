@@ -137,3 +137,11 @@ def test_trend_command_writes_html(project, tmp_path):
     assert r.exit_code == 0, r.output
     html = out.read_text()
     assert html.count("<svg") == 2 and "2026-01" in html
+
+
+def test_trend_unwritable_output_names_the_file_not_the_cache(project, tmp_path):
+    out = tmp_path / "missing-dir" / "out.html"
+    r = run("trend", "-C", project, "-o", str(out))
+    assert r.exit_code == 1
+    assert f"error: {out}" in r.stderr.replace("\n", "")
+    assert "cache" not in r.stderr
