@@ -22,3 +22,11 @@ def isolated_env(tmp_path_factory, monkeypatch):
     for key, value in GIT_IDENTITY.items():
         monkeypatch.setenv(key, value)
     return home
+
+
+from helpers import ScriptedRepo  # noqa: E402
+
+
+@pytest.fixture
+def repo(tmp_path):
+    return ScriptedRepo(tmp_path / "repo")
