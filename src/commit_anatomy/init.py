@@ -12,6 +12,7 @@ from pathlib import PurePosixPath
 from wcmatch import glob
 
 from .analysis import CommitResult, SideResult
+from .classify import GLOB_FLAGS
 from .taxonomy import UNCLASSIFIED, Taxonomy
 
 SPLIT_SHARE = 0.10
@@ -151,6 +152,12 @@ def suggest_splits(
     results: list[CommitResult], taxonomy: Taxonomy, share: float = SPLIT_SHARE
 ) -> list[Suggestion]:
     rules: dict[tuple[str, str], dict] = {}
+    # Who classifies each path now: a suggestion lands in the config, which outranks every
+    # plugin rule, so it must not capture a path that a narrower rule classifies.
+    owners: dict[str, set[tuple[str, str]]] = defaultdict(set)
+    for path, side in _sides(results):
+        if side.match.category != UNCLASSIFIED:
+            owners[path].add((side.match.origin, side.match.rule_id))
     for path, side in _sides(results):
         m = side.match
         pattern = m.matched.split(" + ")[0]
@@ -176,10 +183,22 @@ def suggest_splits(
         if len(big) < 2:
             continue
         for child, n in big:
+            category = _split_category(child, info["category"], taxonomy)
+            if category == info["category"]:
+                continue  # a no-op split refines nothing
+            pattern = f"{glob.escape(info['base'] + '/' + child)}/**"
+            captured = (
+                owner
+                for path, path_owners in owners.items()
+                if glob.globmatch(path, pattern, flags=GLOB_FLAGS)
+                for owner in path_owners
+            )
+            if any(owner != (origin, rule_id) for owner in captured):
+                continue  # it would reclassify files another rule places
             suggestions.append(
                 Suggestion(
-                    (f"{glob.escape(info['base'] + '/' + child)}/**",),
-                    _split_category(child, info["category"], taxonomy),
+                    (pattern,),
+                    category,
                     f"splits {rule_id} ({origin}): {info['base']}/{child}/ carries "
                     f"{n / total:.0%} of its {total} non-blank changed lines",
                 )
