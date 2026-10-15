@@ -13,7 +13,8 @@ def test_plugin_rules_stay_inside_their_scope():
         "extension/package.json": '{"devDependencies": {"wxt": "1"}}',
         "extension/src/a.test.ts": "",
         "extension/tests/e2e/x.ts": "",
-        "tests/x.py": "",  # outside every plugin scope
+        "templates/x.html": "",  # outside every plugin scope
+        "tests/x.py": "",  # outside every plugin scope, but core's tests rule is generic
         "docs/manual/a.md": "",  # docs/manual means docs/user only inside the django scope
     }
     assert classify_paths([core, django, wxt], files) == {
@@ -23,6 +24,7 @@ def test_plugin_rules_stay_inside_their_scope():
         "extension/package.json": "supporting/deps",
         "extension/src/a.test.ts": "tests/unit",
         "extension/tests/e2e/x.ts": "tests/e2e",
-        "tests/x.py": "unclassified",
+        "templates/x.html": "unclassified",
+        "tests/x.py": "tests/unit",
         "docs/manual/a.md": "docs/dev",
     }

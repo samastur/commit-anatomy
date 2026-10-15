@@ -40,6 +40,26 @@ RULES = [
         "**/*.{png,jpg,jpeg,gif,svg,webp,avif,ico,pdf,ttf,otf,woff,woff2}",
     ),
     rule("core:docs", "docs/dev", "docs/**", "**/*.{md,rst}"),
+    rule(
+        "core:deps",
+        "supporting/deps",
+        "pyproject.toml",
+        "uv.lock",
+        "poetry.lock",
+        "requirements*.txt",
+        ".python-version",
+    ),
+    rule(
+        "core:test-support",
+        "tests/support",
+        "**/conftest.py",
+        "tests/**/factories*.py",
+        "tests/**/fixtures/**",
+    ),
+    rule("core:integration", "tests/integration", "tests/**/integration/**"),
+    rule("core:e2e", "tests/e2e", "tests/**/e2e/**", "tests/e2e/**"),
+    rule("core:tests", "tests/unit", "tests/**", "**/tests/**", "**/test_*.py"),
+    rule("core:app", "code/app", "src/**", "**/*.py"),
 ]
 
 

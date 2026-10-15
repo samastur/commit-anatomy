@@ -94,8 +94,8 @@ def test_rows_for_a_root_commit(repo):
     )
     code = next(r for r in rows_from([result]) if r.path == "src/app.py" and r.label == "code")
     assert (code.rule_id, code.rule_origin, code.subject) == (
-        "django:app",
-        "plugin:django",
+        "core:app",
+        "plugin:core",
         "feat: start",
     )
 

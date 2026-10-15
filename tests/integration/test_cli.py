@@ -67,7 +67,7 @@ def test_exit_codes(project, tmp_path):
 def test_explain(project):
     r = run("explain", "HEAD", "-C", project)
     assert r.exit_code == 0, r.output
-    assert "src/app.py" in r.stdout and "django:app" in r.stdout
+    assert "src/app.py" in r.stdout and "core:app" in r.stdout
 
 
 def test_detect_and_rules(project):

@@ -12,37 +12,15 @@ _DJANGO_DEP = re.compile(r"^django(?:$|[\s\[<>=!~;])", re.IGNORECASE)
 RULES = [
     rule("django:migrations", "supporting/migrations", "**/migrations/*.py"),
     rule("django:translations", "supporting/translations", "**/locale/**"),
-    rule(
-        "django:deps",
-        "supporting/deps",
-        "pyproject.toml",
-        "uv.lock",
-        "poetry.lock",
-        "requirements*.txt",
-        ".python-version",
-    ),
     rule("django:user-docs", "docs/user", "docs/manual/**"),
     rule("django:api-docs", "docs/api", "docs/api/**"),
     rule("django:dev-docs", "docs/dev", "docs/dev/**"),
     rule(
-        "django:test-support",
-        "tests/support",
-        "**/conftest.py",
-        "tests/**/factories*.py",
-        "tests/**/fixtures/**",
-    ),
-    rule("django:integration", "tests/integration", "tests/**/integration/**"),
-    rule("django:e2e", "tests/e2e", "tests/**/e2e/**", "tests/e2e/**"),
-    rule("django:tests", "tests/unit", "tests/**", "**/tests/**", "**/test_*.py"),
-    rule("django:tooling", "code/tooling", "scripts/**"),
-    rule(
         "django:app",
         "code/app",
         "manage.py",
-        "src/**",
         "**/templates/**",
         "**/static/**",
-        "**/*.py",
     ),
 ]
 

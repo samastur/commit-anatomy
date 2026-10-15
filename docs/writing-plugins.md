@@ -124,8 +124,10 @@ generated", that should win regardless of where the file lives.
 
 **Where your rules sit among others.** Scoped plugins are tried deepest root first, then
 alphabetically by plugin entry-point name, and `core` last. So you don't need to restate
-core's rules (README, CHANGELOG, `.github/`, images…), and a nested project's rules beat the
-outer project's. Config rules from the user always come before yours.
+core's rules (README, CHANGELOG, `.github/`, images, `tests/`, `src/`, `*.py`,
+`pyproject.toml`…), and a nested project's rules beat the outer project's. Core's
+`src/**` and `**/*.py` are a fallback: a framework plugin that needs a narrower meaning for
+some of those files (`**/migrations/*.py`) says so in its own rules, which come first. Config rules from the user always come before yours.
 
 Return the same list on every call; define it once at module level.
 
