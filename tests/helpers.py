@@ -52,3 +52,7 @@ class ScriptedRepo:
             env={"GIT_AUTHOR_DATE": stamp, "GIT_COMMITTER_DATE": stamp},
         )
         return self.git("rev-parse", "HEAD").strip()
+
+
+# docstring, code, blank, comment, code
+APP = '"""Doc."""\nimport os\n\n# note\nx = 1\n'
