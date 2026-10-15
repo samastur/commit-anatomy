@@ -56,3 +56,10 @@ class ScriptedRepo:
 
 # docstring, code, blank, comment, code
 APP = '"""Doc."""\nimport os\n\n# note\nx = 1\n'
+
+
+def seed_project(repo: "ScriptedRepo") -> "ScriptedRepo":
+    """A small Django-shaped history: one feature commit, then one fix."""
+    repo.commit("feat: start", {"manage.py": "", "src/app.py": APP, "README.md": "# T\n\nText\n"})
+    repo.commit("fix: tweak", {"src/app.py": APP + "y = 2\n"})
+    return repo
