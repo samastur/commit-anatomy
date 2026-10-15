@@ -28,3 +28,6 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["tests"]
+
+[project.entry-points."commit_anatomy.plugins"]
+core = "commit_anatomy.plugins.core:plugin"
