@@ -6,7 +6,8 @@ import sqlite3
 import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import date
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
@@ -19,8 +20,16 @@ from rich.text import Text
 from .aggregate import aggregate
 from .analysis import Analyzer
 from .cache import MemoryCache, SqliteCache, cache_home
-from .config import ConfigError, EffectiveConfig, load_config
+from .config import (
+    REPO_FILE,
+    ConfigError,
+    EffectiveConfig,
+    config_home,
+    load_config,
+    normalize_remote,
+)
 from .git import GitError, GitRepo
+from .init import render_config, suggest_splits, suggest_unclassified
 from .lexers.pygments_backend import PygmentsLabeler
 from .model import Scope
 from .plugins.base import GitRepoView, Plugin, PluginError, active_scopes, load_plugins
@@ -246,6 +255,54 @@ def trend(
         )
     output.write_text(html, encoding="utf-8")
     _stderr().print(Text(f"Wrote {output}"))
+
+
+@app.command()
+@_handle_errors
+def init(
+    revspec: Revspecs = None,
+    repo: RepoOption = Path("."),
+    user: Annotated[
+        bool,
+        typer.Option(
+            "--user/--repo",
+            help="Write your per-repo user config (default) or the in-repo .commit-anatomy.toml.",
+        ),
+    ] = True,
+    force: Annotated[bool, typer.Option("--force", help="Overwrite an existing file.")] = False,
+    no_cache: NoCache = False,
+) -> None:
+    """Write a starter config with suggested rules, from the repository's history."""
+    with _session(repo, no_cache) as s:
+        root = s.repo.root
+        if user:
+            target = config_home() / "repos" / f"{root.name}.toml"
+            origin = f"user:{target.name}"
+            remote = s.repo.remote_url()
+            match = {"remote": normalize_remote(remote)} if remote else {"path": str(root)}
+        else:
+            target, origin, match = root / REPO_FILE, REPO_FILE, None
+        if target.exists() and not force:
+            raise ConfigError(target, "init", "file exists; use --force to overwrite")
+        shas = s.repo.list_commits(revspec or ["HEAD"], history=True)
+        # Analyse without the rules of the file about to be (re)written, or they would hide
+        # exactly the paths it needs to suggest and --force would replace them with nothing.
+        kept = tuple((rule, o) for rule, o in s.config.rules if o != origin)
+        config = replace(s.config, rules=kept)
+        analyzer = Analyzer(s.repo, s.analyzer.cache, config, s.active, s.analyzer.labeler)
+        results = analyzer.analyze(shas)
+        _warn_unlexed(analyzer)
+        text = render_config(
+            unclassified=suggest_unclassified(results, config.taxonomy),
+            splits=suggest_splits(results, config.taxonomy),
+            active=s.active,
+            commits=len(shas),
+            match=match,
+            today=date.today(),
+        )
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text, encoding="utf-8")
+    _stderr().print(Text(f"Wrote {target}"))
 
 
 @app.command()
