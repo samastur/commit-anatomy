@@ -65,7 +65,7 @@ def normalize_remote(url: str) -> str:
     return u.rstrip("/").removesuffix(".git").lower()
 
 
-def _read(path: Path) -> dict:
+def read_config_file(path: Path) -> dict:
     try:
         return tomllib.loads(path.read_text(encoding="utf-8"))
     except tomllib.TOMLDecodeError as e:
@@ -201,12 +201,12 @@ def load_config(
     repos_dir = config_home() / "repos"
     if repos_dir.is_dir():
         for path in sorted(repos_dir.glob("*.toml")):
-            data = _read(path)
+            data = read_config_file(path)
             if _matches(path, data, repo_root, remote):
                 sources.append((path, data, f"user:{path.name}"))
     repo_file = repo_root / REPO_FILE
     if repo_file.is_file():
-        data = _read(repo_file)
+        data = read_config_file(repo_file)
         if "match" in data:
             raise ConfigError(repo_file, "match", "only allowed in user config files")
         sources.append((repo_file, data, REPO_FILE))

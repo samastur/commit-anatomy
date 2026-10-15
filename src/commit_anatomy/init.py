@@ -173,8 +173,17 @@ def suggest_splits(
     return suggestions
 
 
-def _toml(value: str) -> str:
-    return json.dumps(value, ensure_ascii=False)  # a JSON string is a valid TOML basic string
+def _toml(value) -> str:
+    """A TOML value for the strings, booleans, integers, lists and tables a config holds."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, list):
+        return f"[{', '.join(_toml(v) for v in value)}]"
+    if isinstance(value, dict):
+        return "{" + ", ".join(f"{_toml(str(k))} = {_toml(v)}" for k, v in value.items()) + "}"
+    return json.dumps(str(value), ensure_ascii=False)  # a JSON string is a TOML basic string
 
 
 def render_config(
@@ -185,6 +194,7 @@ def render_config(
     commits: int,
     match: dict | None,
     today: date,
+    carried: dict | None = None,
 ) -> str:
     plugins = ", ".join(f"{p.name} ({s.root or '/'})" for p, s in active) or "none"
     lines = [
@@ -196,6 +206,13 @@ def render_config(
     ]
     if match:
         lines += ["[match]", *(f"{k} = {_toml(v)}" for k, v in match.items()), ""]
+    for name, table in (carried or {}).items():
+        lines += [
+            f"# [{name}] carried over from the file this one replaced",
+            f"[{name}]",
+            *(f"{_toml(str(k))} = {_toml(v)}" for k, v in table.items()),
+            "",
+        ]
     if not unclassified and not splits:
         lines.append("# No suggestions: every file is classified and no rule needs splitting.")
     for heading, group in (

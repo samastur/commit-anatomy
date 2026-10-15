@@ -132,3 +132,26 @@ def test_init_repo_force_ignores_the_in_repo_file_it_replaces(repo):
     assert runner.invoke(app, ["init", "-C", path, "--repo"]).exit_code == 0
     assert runner.invoke(app, ["init", "-C", path, "--repo", "--force"]).exit_code == 0
     assert '"tools/**"' in (repo.path / ".commit-anatomy.toml").read_text()
+
+
+def test_init_force_keeps_the_replaced_files_taxonomy_and_intent(repo):
+    repo.commit(
+        "feat: start",
+        {"tools/build.sh": "echo\n", "docs/a/x.md": "a\nb\n", "docs/b/y.md": "c\nd\n"},
+    )
+    path = str(repo.path)
+    target = config_home() / "repos" / "repo.toml"
+    target.parent.mkdir(parents=True)
+    target.write_text(
+        f"[match]\npath = {json.dumps(path)}\n\n"
+        "[taxonomy.data]\nsubcategories = []\n\n"
+        '[taxonomy.remap]\n"docs/dev" = "data"\n\n'
+        '[intent.keywords]\nfeat = ["add"]\n\n'
+        '[[rules]]\npaths = ["tools/**"]\ncategory = "data"\n'
+    )
+    old = tomllib.loads(target.read_text())
+    assert runner.invoke(app, ["init", "-C", path, "--force"]).exit_code == 0
+    new = tomllib.loads(target.read_text())
+    assert new["taxonomy"] == old["taxonomy"] and new["intent"] == old["intent"]
+    after = runner.invoke(app, ["analyze", "-C", path, "--history", "-f", "json"])
+    assert after.exit_code == 0, after.output
