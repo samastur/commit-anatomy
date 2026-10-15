@@ -105,6 +105,10 @@ def test_normalize_remote(url):
         ('[taxonomy.docs]\ncolour = "red"\n', "taxonomy"),
         ('match = { path = "/x" }\n', "match"),
         ("[[rules]\n", "toml"),
+        ('[intent]\nkeywords = "x"\n', "intent.keywords"),
+        ("[intent]\noverrides = []\n", "intent.overrides"),
+        ("taxonomy = 1\n", "taxonomy"),
+        ('[taxonomy]\ndocs = "x"\n', "taxonomy"),
     ],
 )
 def test_invalid_repo_config_names_file_and_field(tmp_path, body, field):
@@ -152,3 +156,25 @@ def test_taxonomy_and_intent_merge_with_user_winning(tmp_path, user_repos):
     assert cfg.intent.keywords["fix"][0] == "fix*"  # untouched defaults stay
     assert cfg.intent.overrides == {"abcd": "fix"}
     assert cfg.rules[0][0].category == "docs/adr"
+
+
+@pytest.mark.parametrize(
+    ("match", "field"), [("path = 5", "match.path"), ("remote = 5", "match.remote")]
+)
+def test_non_string_match_value_is_an_error(tmp_path, user_repos, match, field):
+    write(user_repos / "x.toml", f"match = {{ {match} }}\n")
+    with pytest.raises(ConfigError) as error:
+        load_config(tmp_path, None, resolve)
+    assert f": {field}:" in str(error.value)
+
+
+def test_non_utf8_config_is_an_error(tmp_path):
+    (tmp_path / ".commit-anatomy.toml").write_bytes(b"\xff\xfe\x00")
+    with pytest.raises(ConfigError, match="cannot read"):
+        load_config(tmp_path, None, resolve)
+
+
+def test_unreadable_config_path_is_an_error(tmp_path, user_repos):
+    (user_repos / "dir.toml").mkdir(parents=True)
+    with pytest.raises(ConfigError, match="cannot read"):
+        load_config(tmp_path, None, resolve)
