@@ -350,7 +350,11 @@ def rules(repo: RepoOption = Path(".")) -> None:
 @_handle_errors
 def cache_info() -> None:
     """Show where the cache is and what it holds."""
-    cache = SqliteCache(cache_home() / "cache.sqlite")
+    path = cache_home() / "cache.sqlite"
+    if not path.exists():
+        Console().print(Text(f"No cache at {path}"))
+        return
+    cache = SqliteCache(path)
     try:
         info = cache.info()
     finally:

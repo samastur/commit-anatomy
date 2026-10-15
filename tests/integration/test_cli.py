@@ -145,3 +145,11 @@ def test_trend_unwritable_output_names_the_file_not_the_cache(project, tmp_path)
     assert r.exit_code == 1
     assert f"error: {out}" in r.stderr.replace("\n", "")
     assert "cache" not in r.stderr
+
+
+def test_cache_info_without_a_cache_creates_nothing(isolated_env):
+    cache_dir = isolated_env / "cache"
+    r = run("cache", "info")
+    assert r.exit_code == 0, r.output
+    assert "no cache" in r.stdout.lower()
+    assert not cache_dir.exists()
