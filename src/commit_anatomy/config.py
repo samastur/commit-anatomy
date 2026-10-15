@@ -70,6 +70,8 @@ def _read(path: Path) -> dict:
         return tomllib.loads(path.read_text(encoding="utf-8"))
     except tomllib.TOMLDecodeError as e:
         raise ConfigError(path, "toml", str(e)) from None
+    except (OSError, UnicodeDecodeError) as e:
+        raise ConfigError(path, "file", f"cannot read: {e}") from None
 
 
 def _matches(path: Path, data: dict, repo_root: Path, remote: str | None) -> bool:
@@ -80,6 +82,9 @@ def _matches(path: Path, data: dict, repo_root: Path, remote: str | None) -> boo
             "match",
             'a user config needs match = { path = "..." } or match = { remote = "..." }',
         )
+    for key in match:
+        if not isinstance(match[key], str) or not match[key]:
+            raise ConfigError(path, f"match.{key}", "must be a non-empty string")
     if "path" in match:
         return Path(match["path"]).expanduser().resolve() == repo_root.resolve()
     return remote is not None and normalize_remote(match["remote"]) == normalize_remote(remote)
@@ -91,6 +96,9 @@ def _intent(path: Path, table) -> tuple[dict[str, tuple[str, ...]], dict[str, st
     unknown = set(table) - {"keywords", "overrides"}
     if unknown:
         raise ConfigError(path, f"intent.{sorted(unknown)[0]}", "unknown field")
+    for key in ("keywords", "overrides"):
+        if not isinstance(table.get(key, {}), dict):
+            raise ConfigError(path, f"intent.{key}", "must be a table")
     keywords: dict[str, tuple[str, ...]] = {}
     for intent, words in table.get("keywords", {}).items():
         if intent not in INTENTS or intent == "unknown":
@@ -213,6 +221,8 @@ def load_config(
     overrides: dict[str, str] = {}
     for path, data, _ in reversed(sources):  # lowest precedence first, so the user file wins
         if "taxonomy" in data:
+            if not isinstance(data["taxonomy"], dict):
+                raise ConfigError(path, "taxonomy", "must be a table")
             try:
                 taxonomy = taxonomy.extended(data["taxonomy"])
             except TaxonomyError as e:
