@@ -92,7 +92,14 @@ def load_plugins() -> list[Plugin]:
 
 
 def active_scopes(plugins: list[Plugin], view: RepoView) -> list[tuple[Plugin, Scope]]:
-    return [(plugin, scope) for plugin in plugins for scope in plugin.detect(view)]
+    active = []
+    for plugin in plugins:
+        try:
+            scopes = plugin.detect(view)
+        except Exception as e:
+            raise PluginError(f"plugin {plugin.name!r} failed to detect: {e}") from e
+        active.extend((plugin, scope) for scope in scopes)
+    return active
 
 
 def language_hint(active: list[tuple[Plugin, Scope]], path: str) -> str | None:

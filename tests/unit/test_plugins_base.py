@@ -1,5 +1,8 @@
+import pytest
+
 from commit_anatomy.model import Scope
 from commit_anatomy.plugins.base import (
+    PluginError,
     StaticRepoView,
     active_scopes,
     language_hint,
@@ -56,3 +59,15 @@ def test_rule_helper_and_namespaced_ids():
     r = rule("x:y", "docs/dev", "a", "b", stage="pre")
     assert (r.paths, r.stage, r.content_lines) == (("a", "b"), "pre", 5)
     assert all(r.id.startswith("core:") for r in core.rules())
+
+
+def test_detect_failure_becomes_plugin_error():
+    class Broken(FakePlugin):
+        name = "broken"
+
+        def detect(self, repo):
+            raise ValueError("boom")
+
+    with pytest.raises(PluginError, match="plugin 'broken' failed to detect: boom") as info:
+        active_scopes([Broken()], StaticRepoView({}))
+    assert isinstance(info.value.__cause__, ValueError)
