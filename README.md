@@ -26,8 +26,10 @@ commit-anatomy init                             # starter config with suggested 
 commit-anatomy cache info | cache clear
 ```
 
-All commands take `-C <repo>`. Counts use non-blank lines by default (`--basis total`
-to include blank lines) and added + deleted lines (`--metric added|deleted`).
+The repository commands (`analyze`, `explain`, `trend`, `detect`, `rules`, `init`) take
+`-C <repo>` (default: the current directory); `cache` is global. `analyze` and `trend`
+count non-blank lines by default (`--basis non_blank`, or `--basis total` to include blank
+lines) and added + deleted lines (`--metric churn`, the default, or `added` / `deleted`).
 
 ## Configure
 
