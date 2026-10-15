@@ -388,7 +388,8 @@ target is the ≤ 1 % unclassified criterion.
   TypeScript, Swift, Go, Kotlin).
 - **Integration**: scripted throwaway repos in `tmp_path` (`git init`,
   commits, renames, moves across categories, binary files, merge, root
-  commit); assert exact tidy rows.
+  commit); assert exact tidy rows. `init` on such a repo: pinned output,
+  refusal to overwrite, and 0 unclassified after applying its suggestions.
 - **Golden per plugin**: a minimal ecosystem skeleton per plugin; pin
   `detect` output and classification of typical files.
 - No test depends on the hrcek repos. Manual acceptance: run `analyze`
