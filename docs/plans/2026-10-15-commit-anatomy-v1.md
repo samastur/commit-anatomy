@@ -96,6 +96,7 @@ version = "0.1.0"
 description = "Break commits down into docs, tests, code and supporting changes"
 readme = "README.md"
 requires-python = ">=3.12"
+license = "MIT"
 dependencies = ["pygments>=2.18", "wcmatch>=10", "typer>=0.12", "rich>=13"]
 
 [project.scripts]
