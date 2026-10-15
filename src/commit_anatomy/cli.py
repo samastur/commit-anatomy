@@ -27,6 +27,7 @@ from .config import (
     config_home,
     load_config,
     normalize_remote,
+    read_config_file,
 )
 from .git import GitError, GitRepo
 from .init import render_config, suggest_splits, suggest_unclassified
@@ -292,6 +293,12 @@ def init(
             target, origin, match = root / REPO_FILE, REPO_FILE, None
         if target.exists() and not force:
             raise ConfigError(target, "init", "file exists; use --force to overwrite")
+        # The replaced file's [taxonomy] and [intent] still shape this analysis and may define
+        # categories the suggestions use, so the rewritten file keeps them.
+        carried = {}
+        if target.resolve() in {f.resolve() for f in s.config.files}:
+            old = read_config_file(target)
+            carried = {k: old[k] for k in ("taxonomy", "intent") if k in old}
         shas = s.repo.list_commits(revspec or ["HEAD"], history=True)
         # Analyse without the rules of the file about to be (re)written, or they would hide
         # exactly the paths it needs to suggest and --force would replace them with nothing.
@@ -307,6 +314,7 @@ def init(
             commits=len(shas),
             match=match,
             today=date.today(),
+            carried=carried,
         )
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(text, encoding="utf-8")
