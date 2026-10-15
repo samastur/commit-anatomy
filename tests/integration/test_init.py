@@ -155,3 +155,38 @@ def test_init_force_keeps_the_replaced_files_taxonomy_and_intent(repo):
     assert new["taxonomy"] == old["taxonomy"] and new["intent"] == old["intent"]
     after = runner.invoke(app, ["analyze", "-C", path, "--history", "-f", "json"])
     assert after.exit_code == 0, after.output
+
+
+def history_rows(path: str) -> list[dict]:
+    r = runner.invoke(app, ["analyze", "-C", path, "--history", "-f", "json"])
+    assert r.exit_code == 0, r.output
+    return json.loads(r.stdout)
+
+
+def unclassified_after_init(repo) -> list[str]:
+    path = str(repo.path)
+    r = runner.invoke(app, ["init", "-C", path])
+    assert r.exit_code == 0, r.output
+    return sorted({row["path"] for row in history_rows(path) if row["category"] == "unclassified"})
+
+
+def test_init_escapes_glob_characters_in_suggested_paths(repo):
+    repo.commit(
+        "feat: start",
+        {
+            "README.md": "# R\n",
+            "app/[locale]/page.tsx": "export {}\n",
+            "lib/README.md": "# L\n",
+            "lib/a{b,c}.go": "package lib\n",
+            "lib/x*.go": "package lib\n",
+            "lib/q?.go": "package lib\n",
+        },
+    )
+    assert unclassified_after_init(repo) == []
+
+
+def test_init_suggests_root_files_one_by_one(repo):
+    repo.commit("feat: start", {"Makefile": "all:\n\tgo build\n", "main.go": "package main\n"})
+    assert unclassified_after_init(repo) == []
+    text = (config_home() / "repos" / "repo.toml").read_text()
+    assert '"/**"' not in text
