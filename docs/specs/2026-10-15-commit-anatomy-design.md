@@ -70,16 +70,25 @@ Default taxonomy:
 **Line label** — for line-split categories each changed line gets one label:
 `code`, `comment`, `docstring`, `blank`, or `unlexed` (no lexer / lexer
 failure / oversize blob). A line containing both code and a trailing comment
-is `code`. For non-split categories every line is labelled `raw`.
+is `code`. For non-split categories every text line is labelled `blank`
+(whitespace only) or `raw`; blank detection needs no lexer, so every
+category can be measured with and without blank lines.
 
 **Metrics** derived per category:
 
 - `total` = all changed lines (all labels) — reconciles with `git diff --numstat`.
-- `with_comments` = `code + comment + docstring + unlexed`.
+- `non_blank` = `total − blank`; defined for every category and the default
+  basis for comparing categories (so markdown paragraph breaks do not
+  inflate docs relative to code).
+- `with_comments` = `code + comment + docstring + unlexed` (line-split
+  categories; equals `non_blank` there).
 - `code_only` = `code + unlexed`.
-- `blank` is part of `total` only.
 
-`churn` = added + deleted (default); `added` and `deleted` are selectable.
+Example: a commit adding 20 code, 5 comment, 3 docstring and 4 blank lines
+→ `total` 32, `non_blank` = `with_comments` 28, `code_only` 20.
+
+Direction: `churn` = added + deleted (default); `added` and `deleted` are
+selectable. Basis: `non_blank` (default) or `total`.
 
 **Intent** — per commit: `feat | fix | refactor | test | docs | chore |
 release | unknown`. Orthogonal to categories, so reports can say "fix
@@ -159,6 +168,12 @@ until = "a1b2c3d"                # optional; date or commit, exclusive
    `match = { remote = "github.com/Hrcek-app/hrcek-ios" }`.
 2. In-repo: `.commit-anatomy.toml` at the repo root.
 
+Why user config wins: the in-repo file is the team's shared, committed
+view; the user file is the analyst's personal view of that same repo (like
+`.git/info/exclude` vs `.gitignore`) — for repos one cannot or does not want
+to commit to, or to disagree locally without editing the shared file. There
+is deliberately no repo-independent global user config in v1.
+
 Config files can contain `[[rules]]`, `[taxonomy]` (add or rename
 categories, set `split_lines`), `[intent]` (keyword tables) and
 `[intent.overrides]` (`"<sha prefix>" = "fix"`).
@@ -198,7 +213,8 @@ class LineLabeler(Protocol):
     def label(self, path: str, content: bytes, hint: str | None) -> list[Label]: ...
 ```
 
-- Runs only for categories with `split_lines = true`.
+- Full lexing runs only for categories with `split_lines = true`; for all
+  other text files only blank detection runs (no lexer).
 - Lexes the *whole* old and new blob (so multi-line comments and docstrings
   are correct), then reads labels for `removed_lines` (old) and
   `added_lines` (new).
@@ -254,17 +270,19 @@ touch git.
 ```
 commit-anatomy analyze [REVSPEC...] [-C REPO] [--since D] [--until D]
                        [--by commit|intent|week|month|total] [--level top|sub]
-                       [--metric churn|added|deleted] [--format table|json|csv]
+                       [--metric churn|added|deleted] [--basis non_blank|total]
+                       [--format table|json|csv]
                        [--merges] [--no-cache]
 commit-anatomy explain COMMIT [-C REPO] [--path GLOB]
 commit-anatomy trend   [REVSPEC...] [-C REPO] --bucket week|month [-o FILE.html]
 commit-anatomy detect  [-C REPO]
 commit-anatomy rules   [-C REPO]
+commit-anatomy init    [-C REPO] [--user|--repo] [REVSPEC...] [--force]
 ```
 
 - **analyze / table**: one row per group; for each top category `+a −d`
-  and share of the group; for line-split categories `total`,
-  `code_only` and comment lines. Footer: totals, `moved` count,
+  and share of the group on the selected basis (`non_blank` by default);
+  for line-split categories also `code_only` and comment lines. Footer: totals, `moved` count,
   `unclassified` (highlighted when non-zero).
 - **analyze / json, csv**: the tidy rows (`--by` ignored), loadable
   straight into pandas or a spreadsheet.
@@ -276,6 +294,21 @@ commit-anatomy rules   [-C REPO]
   absolute churn per bucket.
 - **detect**: active plugins and scopes, config files found.
 - **rules**: the effective ordered rule list with origins.
+- **init**: writes a starter config — the user per-repo file by default
+  (`--user`, with `match` set to the repo's remote, or its path if there is
+  no remote) or `.commit-anatomy.toml` with `--repo`. Deterministic, from
+  introspection over REVSPEC (default: full history of HEAD):
+  - header comment with detected plugins and scopes;
+  - one suggested rule per directory whose files end up `unclassified`
+    (best-guess category from the core heuristics, otherwise
+    `unclassified`), with a comment giving file count and churn;
+  - a suggested split where one rule matches several sibling directories
+    that each carry ≥ 10 % of that rule's churn (e.g. `docs/**` matching
+    both `docs/manual/` and `docs/dev/`), with a comment;
+  - every suggestion is an active rule with a `# why:` comment; the user
+    edits or deletes them and checks the effect with `explain`.
+  Refuses to overwrite an existing file unless `--force`. Without `init`,
+  configuration is optional and written by hand.
 
 Exit codes: 0 success, 1 runtime error (not a git repo, bad revspec — git's
 stderr included), 2 usage or config error.
@@ -393,4 +426,5 @@ Console script: `commit-anatomy`. Entry-point group:
   `src/test` vs `src/androidTest`, `res/values-*/strings.xml`, Room schemas).
 - tree-sitter labeller backend.
 - PR-level grouping via GitHub API; multi-repo trend charts.
-- Optional LLM fallback for `unknown` intent.
+- Optional LLM fallback for `unknown` intent; LLM-assisted `init`.
+- Repo-independent global user config (between in-repo config and plugins).
