@@ -114,7 +114,15 @@ def _handle_errors(fn):
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
         try:
-            return fn(*args, **kwargs)
+            result = fn(*args, **kwargs)
+            sys.stdout.flush()  # surface a closed pipe here, not at interpreter exit
+            return result
+        except BrokenPipeError:
+            # The reader went away (`| head`). Python's documented pattern: point stdout at
+            # devnull so the flush at exit does not fail again, and exit without a message.
+            devnull = os.open(os.devnull, os.O_WRONLY)
+            os.dup2(devnull, sys.stdout.fileno())
+            raise typer.Exit(141) from None
         except ConfigError as e:
             _stderr().print(Text(f"error: {e}", style="red"))
             raise typer.Exit(2) from None
