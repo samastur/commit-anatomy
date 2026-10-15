@@ -1,6 +1,7 @@
 """commit-anatomy command line."""
 
 import functools
+import sqlite3
 import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -100,6 +101,12 @@ def _handle_errors(fn):
         except (GitError, PluginError) as e:
             _stderr().print(Text(f"error: {e}", style="red"))
             raise typer.Exit(1) from None
+        except (sqlite3.Error, OSError) as e:
+            path = cache_home() / "cache.sqlite"
+            hint = "delete the file or run `commit-anatomy cache clear`"
+            message = Text(f"error: cache {path}: {e} ({hint})", style="red")
+            _stderr().print(message, soft_wrap=True)
+            raise typer.Exit(1) from None
 
     return wrapper
 
@@ -115,8 +122,9 @@ class Session:
 @contextmanager
 def _session(path: Path, no_cache: bool) -> Iterator[Session]:
     repo = GitRepo(path)
-    cache = MemoryCache() if no_cache else SqliteCache(cache_home() / "cache.sqlite")
+    cache = None
     try:
+        cache = MemoryCache() if no_cache else SqliteCache(cache_home() / "cache.sqlite")
         if repo.is_shallow():
             _stderr().print(Text("warning: shallow clone, history is truncated", style="yellow"))
         active = active_scopes(load_plugins(), GitRepoView(repo))
@@ -124,7 +132,8 @@ def _session(path: Path, no_cache: bool) -> Iterator[Session]:
         analyzer = Analyzer(repo, cache, config, active, PygmentsLabeler())
         yield Session(repo, active, config, analyzer)
     finally:
-        cache.close()
+        if cache is not None:
+            cache.close()
         repo.close()
 
 
@@ -249,11 +258,16 @@ def cache_clear(
 ) -> None:
     """Delete cached entries (both kinds unless one is chosen)."""
     both = not blobs and not commits
-    cache = SqliteCache(cache_home() / "cache.sqlite")
+    path = cache_home() / "cache.sqlite"
     try:
-        cache.clear(blobs=blobs or both, commits=commits or both)
-    finally:
-        cache.close()
+        cache = SqliteCache(path)
+        try:
+            cache.clear(blobs=blobs or both, commits=commits or both)
+        finally:
+            cache.close()
+    except sqlite3.Error:
+        # An unreadable database cannot be cleared selectively: remove the file.
+        path.unlink(missing_ok=True)
     _stderr().print("Cache cleared.")
 
 

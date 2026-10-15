@@ -115,3 +115,17 @@ def test_explain_warns_about_unlexed_extensions(unlexed_project):
     r = run("explain", "HEAD", "-C", unlexed_project)
     assert r.exit_code == 0, r.output
     assert r.stderr.count("lines in .zzz files could not be lexed") == 1
+
+
+def test_corrupt_cache_is_reported_and_cache_clear_recovers(project, isolated_env):
+    cache_dir = isolated_env / "cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    (cache_dir / "cache.sqlite").write_bytes(b"this is not a database" * 100)
+    r = run("analyze", "-C", project)
+    assert r.exit_code == 1
+    assert "error: cache" in r.stderr and "cache clear" in r.stderr
+    assert "Traceback" not in r.stderr
+    assert r.exception is None or isinstance(r.exception, SystemExit)
+    assert run("cache", "info").exit_code == 1
+    assert run("cache", "clear").exit_code == 0
+    assert run("analyze", "-C", project).exit_code == 0
