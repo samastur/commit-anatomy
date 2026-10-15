@@ -31,3 +31,6 @@ pythonpath = ["tests"]
 
 [project.entry-points."commit_anatomy.plugins"]
 core = "commit_anatomy.plugins.core:plugin"
+django = "commit_anatomy.plugins.django:plugin"
+wxt = "commit_anatomy.plugins.wxt:plugin"
+xcode = "commit_anatomy.plugins.xcode:plugin"
