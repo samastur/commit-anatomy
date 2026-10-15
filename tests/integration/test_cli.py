@@ -1,4 +1,7 @@
 import json
+import os
+import subprocess
+import sys
 
 import pytest
 from helpers import seed_project
@@ -153,3 +156,21 @@ def test_cache_info_without_a_cache_creates_nothing(isolated_env):
     assert r.exit_code == 0, r.output
     assert "no cache" in r.stdout.lower()
     assert not cache_dir.exists()
+
+
+@pytest.mark.parametrize("unbuffered", ["", "1"])
+def test_closed_stdout_pipe_exits_quietly(project, unbuffered):
+    # `analyze -f json | head -1`: the reader goes away before the output is written. Unbuffered,
+    # the write itself fails (as with output larger than the buffer); buffered, the exit flush does.
+    script = "import sys; from commit_anatomy.cli import main; sys.argv[0] = 'ca'; main()"
+    proc = subprocess.Popen(
+        [sys.executable, "-c", script, "analyze", "-C", project, "--history", "-f", "json"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env={**os.environ, "PYTHONUNBUFFERED": unbuffered},
+    )
+    proc.stdout.close()
+    stderr = proc.stderr.read().decode()
+    proc.wait(timeout=60)
+    assert stderr == ""
+    assert proc.returncode in (0, 141)
