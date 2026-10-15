@@ -133,7 +133,7 @@ class GitRepo:
     def head_files(self) -> list[str]:
         if self._call("rev-parse", "--verify", "--quiet", "HEAD").returncode != 0:
             return []
-        out = self._run("ls-tree", "-r", "--name-only", "-z", "HEAD")
+        out = self._run("ls-tree", "-r", "--full-tree", "--name-only", "-z", "HEAD")
         return [p for p in out.split("\x00") if p]
 
     def read_head_file(self, path: str) -> bytes | None:

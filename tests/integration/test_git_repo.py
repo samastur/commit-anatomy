@@ -82,3 +82,11 @@ def test_remote_shallow_ancestry_and_resolution(repo):
 def test_root_is_the_toplevel_even_from_a_subdirectory(repo):
     repo.commit("one", {"sub/a.txt": "1\n"})
     assert GitRepo(repo.path / "sub").root == repo.path.resolve()
+
+
+def test_head_files_from_a_subdirectory_are_root_relative(repo):
+    repo.commit("one", {"a.txt": "1\n", "sub/b.txt": "2\n"})
+    g = GitRepo(repo.path / "sub")
+    assert g.head_files() == ["a.txt", "sub/b.txt"]
+    assert g.read_head_file("sub/b.txt") == b"2\n"
+    g.close()
