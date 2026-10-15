@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import PurePosixPath
 
+from wcmatch import glob
+
 from .analysis import CommitResult, SideResult
 from .taxonomy import UNCLASSIFIED, Taxonomy
 
@@ -32,6 +34,10 @@ CODE_EXT = frozenset(
 )
 DOC_EXT = frozenset("md rst txt adoc".split())
 DATA_EXT = frozenset("json yaml yml toml ini cfg xml plist".split())
+BUILD_NAMES = frozenset(
+    "makefile gnumakefile justfile cmakelists.txt dockerfile procfile vagrantfile".split()
+)
+BUILD_FILE = "build file"
 SPLIT_HINTS = {
     "docs": {
         **dict.fromkeys(("manual", "user", "guide", "guides", "help", "handbook"), "docs/user"),
@@ -76,9 +82,16 @@ def guess_category(directory: str, filenames: list[str], taxonomy: Taxonomy) -> 
         for names, category in NAME_HINTS:
             if segment in names and taxonomy.is_valid(category):
                 return category, f"directory name {segment!r}"
-    extensions = Counter(PurePosixPath(n).suffix.lower().lstrip(".") for n in filenames)
-    if extensions:
-        ext = extensions.most_common(1)[0][0]
+    kinds = Counter(
+        BUILD_FILE
+        if PurePosixPath(n).name.lower() in BUILD_NAMES
+        else PurePosixPath(n).suffix.lower().lstrip(".")
+        for n in filenames
+    )
+    if kinds:
+        ext = kinds.most_common(1)[0][0]
+        if ext == BUILD_FILE and taxonomy.is_valid("supporting/build"):
+            return "supporting/build", "a build file name"
         for group, category in (
             (CODE_EXT, "code/app"),
             (DOC_EXT, "docs/dev"),
@@ -104,13 +117,14 @@ def suggest_unclassified(results: list[CommitResult], taxonomy: Taxonomy) -> lis
         files = by_dir[directory]
         churn = sum(files.values())
         category, reason = guess_category(directory, list(files), taxonomy)
-        if directory in classified_dirs:
-            # A directory-wide glob would override the files that are already classified.
+        if directory in classified_dirs or not directory:
+            # A directory-wide glob would override the files that are already classified, and
+            # at the root it would cover the whole repository.
             for path in sorted(files):
                 cat, why = guess_category(directory, [path], taxonomy)
                 suggestions.append(
                     Suggestion(
-                        (path,),
+                        (glob.escape(path),),
                         cat,
                         f"unclassified file, {files[path]} non-blank lines changed; "
                         f"guessed from {why}",
@@ -119,7 +133,7 @@ def suggest_unclassified(results: list[CommitResult], taxonomy: Taxonomy) -> lis
         else:
             suggestions.append(
                 Suggestion(
-                    (f"{directory}/**",),
+                    (f"{glob.escape(directory)}/**",),
                     category,
                     f"{len(files)} unclassified file(s), {churn} non-blank lines changed; "
                     f"guessed from {reason}",
@@ -164,7 +178,7 @@ def suggest_splits(
         for child, n in big:
             suggestions.append(
                 Suggestion(
-                    (f"{info['base']}/{child}/**",),
+                    (f"{glob.escape(info['base'] + '/' + child)}/**",),
                     _split_category(child, info["category"], taxonomy),
                     f"splits {rule_id} ({origin}): {info['base']}/{child}/ carries "
                     f"{n / total:.0%} of its {total} non-blank changed lines",
