@@ -1,0 +1,28 @@
+[project]
+name = "commit-anatomy"
+version = "0.1.0"
+description = "Break commits down into docs, tests, code and supporting changes"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+dependencies = ["pygments>=2.18", "wcmatch>=10", "typer>=0.12", "rich>=13"]
+
+[project.scripts]
+commit-anatomy = "commit_anatomy.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6", "click>=8.2"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
