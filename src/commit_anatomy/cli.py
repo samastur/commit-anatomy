@@ -26,6 +26,7 @@ from .plugins.base import GitRepoView, Plugin, PluginError, active_scopes, load_
 from .report.explain import render_explain
 from .report.table import render_table
 from .report.tabular import to_csv, to_json
+from .report.trend import render_trend
 from .rows import rows_from
 
 app = typer.Typer(
@@ -190,6 +191,46 @@ def explain(
     console = Console()
     for result in results:
         console.print(render_explain(result, path))
+
+
+class Bucket(StrEnum):
+    week = "week"
+    month = "month"
+
+
+@app.command()
+@_handle_errors
+def trend(
+    revspec: Revspecs = None,
+    repo: RepoOption = Path("."),
+    bucket: Annotated[Bucket, typer.Option(help="Bar per week or per month.")] = Bucket.week,
+    output: Annotated[Path, typer.Option("--output", "-o", help="HTML file to write.")] = Path(
+        "commit-anatomy-trend.html"
+    ),
+    since: Since = None,
+    until: Until = None,
+    metric: MetricOption = Metric.churn,
+    basis: BasisOption = Basis.non_blank,
+    merges: Merges = False,
+    no_cache: NoCache = False,
+) -> None:
+    """Write an HTML chart of how the change mix evolves over time."""
+    with _session(repo, no_cache) as s:
+        shas = s.repo.list_commits(
+            revspec or ["HEAD"], history=True, since=since, until=until, merges=merges
+        )
+        results = s.analyzer.analyze(shas)
+        _warn_unlexed(s.analyzer)
+        title = f"{s.repo.root.name}: change composition per {bucket}"
+        html = render_trend(
+            aggregate(results, bucket, "top"),
+            s.config.taxonomy,
+            metric=metric,
+            basis=basis,
+            title=title,
+        )
+    output.write_text(html, encoding="utf-8")
+    _stderr().print(Text(f"Wrote {output}"))
 
 
 @app.command()
