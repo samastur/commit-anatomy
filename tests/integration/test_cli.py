@@ -129,3 +129,11 @@ def test_corrupt_cache_is_reported_and_cache_clear_recovers(project, isolated_en
     assert run("cache", "info").exit_code == 1
     assert run("cache", "clear").exit_code == 0
     assert run("analyze", "-C", project).exit_code == 0
+
+
+def test_trend_command_writes_html(project, tmp_path):
+    out = tmp_path / "trend.html"
+    r = run("trend", "-C", project, "--bucket", "month", "-o", str(out))
+    assert r.exit_code == 0, r.output
+    html = out.read_text()
+    assert html.count("<svg") == 2 and "2026-01" in html
