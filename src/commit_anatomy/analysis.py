@@ -114,7 +114,9 @@ class Analyzer:
     ) -> SideResult:
         if ch.submodule:
             category = self.config.taxonomy.remap("supporting/deps")
-            return SideResult(Match(category, "core:submodule", "core", "submodule"), Counter())
+            return SideResult(
+                Match(category, "core:submodule", "plugin:core", "submodule"), Counter()
+            )
         match = self.classifier.classify(path, None if ch.binary else blob, commit)
         if ch.binary or not ranges or blob is None:
             return SideResult(match, Counter())

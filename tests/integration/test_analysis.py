@@ -144,10 +144,11 @@ def test_submodule_counts_as_a_dependency(repo, tmp_path):
     )
     rows = {r.path: r for r in rows_from(analyze(repo, repo.commit("chore: add submodule")))}
     sm = rows["vendor/sm"]
-    assert (sm.category, sm.subcategory, sm.rule_id, sm.added) == (
+    assert (sm.category, sm.subcategory, sm.rule_id, sm.rule_origin, sm.added) == (
         "supporting",
         "deps",
         "core:submodule",
+        "plugin:core",
         0,
     )
 
