@@ -68,4 +68,10 @@ See `docs/specs/2026-10-15-commit-anatomy-design.md` for the full design.
 
 Built in: `core`, `django`, `wxt`, `xcode`. A plugin is any object with `name`,
 `detect(repo)`, `rules()` and `languages()`, registered under the entry-point group
-`commit_anatomy.plugins`.
+`commit_anatomy.plugins`. See `docs/writing-plugins.md`.
+
+## Developing
+
+Start with `docs/getting-started.md`; `docs/architecture.md` explains how the parts fit
+together. Run the checks with `uv run pytest -q`, `uv run ruff check .` and
+`uv run ruff format --check .`.
