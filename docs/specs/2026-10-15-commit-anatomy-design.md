@@ -227,8 +227,7 @@ class LineLabeler(Protocol):
   TypeScript JSDoc, Swift `///` and `/** */`, Go `//`, Kotlin KDoc.
 - Degraded cases → `unlexed`: no lexer, lexer exception, blob > 1 MB
   (configurable). Non-UTF-8 decoded with `errors="replace"`.
-- Labels cached in `~/.cache/commit-anatomy/` keyed by
-  `(blob_sha, lexer alias, labeler.version)`; `--no-cache` disables it.
+- Labels are cached as blob facts (see 3.7).
 - The protocol allows a tree-sitter backend later without touching callers.
 
 ### 3.5 Intent classifier (`intent.py`)
@@ -265,6 +264,39 @@ The aggregator groups rows `--by commit | intent | week | month | total`
 at `--level top | sub`. All reporters consume aggregated or raw rows; none
 touch git.
 
+### 3.7 Cache (`cache.py`)
+
+Principle: **cache facts, never conclusions.** Commits and blobs are
+immutable, so anything keyed by their SHA never goes stale; only our own
+algorithms can invalidate an entry, hence the version in every key.
+Classification, counts and intent are derived at report time from cached
+facts and are never stored. Changing config, taxonomy, intent keywords or
+overrides — or adding a new intent method later — therefore needs no git
+calls and no lexing.
+
+One SQLite file: `~/.cache/commit-anatomy/cache.sqlite`.
+
+- **Blob facts** — key `(blob_sha, lexer alias, labeler.version)`:
+  run-length-encoded line labels for the whole blob, plus its first
+  `HEAD_LINES` lines (20; `content_lines` above 20 is a config error) for
+  content rules. Computed lazily, only when a report needs that blob, so
+  e.g. lock files are never lexed unless a category asks for it.
+- **Commit facts** — key `(commit_sha, facts schema version, diff options
+  such as the `-M` threshold)`: parents, author, author/committer dates,
+  **full message (subject and body)**, and per file change: old/new path,
+  status, similarity, binary flag, old/new blob SHA, changed old/new line
+  numbers as compact ranges. No categories, counts or intent.
+
+Report time: classification = rules over commit facts + blob heads; counts
+= blob labels indexed by the line ranges; intent = classifier over the
+stored message. A future intent method (mainly an LLM reading commit
+messages, optionally with the commit's category composition) works from
+the cache alone; how its results are stored is designed when it is built.
+
+`--no-cache` bypasses reads and writes. `commit-anatomy cache info` shows
+size and entry counts; `commit-anatomy cache clear [--blobs|--commits]`
+deletes entries.
+
 ## 4. CLI
 
 ```
@@ -278,6 +310,7 @@ commit-anatomy trend   [REVSPEC...] [-C REPO] --bucket week|month [-o FILE.html]
 commit-anatomy detect  [-C REPO]
 commit-anatomy rules   [-C REPO]
 commit-anatomy init    [-C REPO] [--user|--repo] [REVSPEC...] [--force]
+commit-anatomy cache   info | clear [--blobs|--commits]
 ```
 
 - **analyze / table**: one row per group; for each top category `+a −d`
@@ -390,6 +423,9 @@ target is the ≤ 1 % unclassified criterion.
   commits, renames, moves across categories, binary files, merge, root
   commit); assert exact tidy rows. `init` on such a repo: pinned output,
   refusal to overwrite, and 0 unclassified after applying its suggestions.
+  Cache: a second run with changed config or intent keywords produces the
+  new result with zero git subprocess calls and zero lexer invocations
+  (asserted via spies); a labeler version bump re-lexes.
 - **Golden per plugin**: a minimal ecosystem skeleton per plugin; pin
   `detect` output and classification of typical files.
 - No test depends on the hrcek repos. Manual acceptance: run `analyze`
@@ -410,7 +446,7 @@ src/commit_anatomy/
   lines.py               # LineLabeler protocol, hunk → label mapping
   lexers/pygments_backend.py
   intent.py
-  cache.py
+  cache.py               # SQLite blob facts + commit facts
   aggregate.py
   report/{table,tabular,trend,explain}.py
   plugins/{base,core,django,wxt,xcode}.py
@@ -427,5 +463,6 @@ Console script: `commit-anatomy`. Entry-point group:
   `src/test` vs `src/androidTest`, `res/values-*/strings.xml`, Room schemas).
 - tree-sitter labeller backend.
 - PR-level grouping via GitHub API; multi-repo trend charts.
-- Optional LLM fallback for `unknown` intent; LLM-assisted `init`.
+- LLM intent classification from cached commit messages (3.7), with its own
+  result store; LLM-assisted `init`.
 - Repo-independent global user config (between in-repo config and plugins).
