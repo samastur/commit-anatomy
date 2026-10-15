@@ -33,7 +33,16 @@ RULES = [
         "Podfile.lock",
     ),
     rule("xcode:assets", "supporting/assets", "**/*.xcassets/**"),
-    rule("xcode:app", "code/app", "**/*.swift", "**/*.{m,mm,h}", "Support/**"),
+    rule(
+        "xcode:app",
+        "code/app",
+        "**/*.swift",
+        "**/*.{m,mm,h}",
+        "Support/**",
+        # JavaScript preprocessing files of share / action extensions
+        # (NSExtensionJavaScriptPreprocessingFile) sit in the extension target.
+        "**/*{Extension,Share,Action}/**/*.js",
+    ),
 ]
 
 
